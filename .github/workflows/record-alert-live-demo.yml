@@ -1,0 +1,61 @@
+name: Record alert live production demo
+
+on:
+  push:
+    branches: [record-alert-live-demo-20260914]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install browser, TTS and media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          python -m pip install --upgrade pip
+          pip install edge-tts
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Generate Yunyang +3% narration
+        run: python scripts/make-live-demo-audio.py
+
+      - name: Record actual production website interactions
+        run: node scripts/record-live-demo.mjs
+
+      - name: Mux browser recording with narration
+        run: |
+          mkdir -p output
+          ffmpeg -y \
+            -i recordings/live-system-demo.webm \
+            -i audio_live_demo/narration.mp3 \
+            -c:v libx264 -preset medium -crf 19 -pix_fmt yuv420p \
+            -c:a aac -b:a 192k -shortest \
+            output/执法全过程多模态智能监督模型_真实系统操作_云扬3%.mp4
+          ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json output/执法全过程多模态智能监督模型_真实系统操作_云扬3%.mp4
+
+      - name: Upload finished video
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-system-demo-yunyang3
+          path: |
+            output/执法全过程多模态智能监督模型_真实系统操作_云扬3%.mp4
+            recordings/live-system-demo.webm
+            audio_live_demo/narration.mp3
+            audio_live_demo/timings.json
+          retention-days: 7
