@@ -35,6 +35,23 @@ jobs:
       - name: Generate Yunyang +3% narration
         run: python scripts/make-live-demo-audio.py
 
+      - name: Harden recorder against optional presentation containers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/record-live-demo.mjs')
+          s=p.read_text(encoding='utf-8')
+          old="""  await tab('AI综合研判'); await show(page.locator('.aiwb'),1500); await show(page.locator('.fmat-wrap'),1800); await show(page.locator('.behgrid'),1800);"""
+          new="""  await tab('AI综合研判'); await show(page.locator('#ai9'),1300);\n  for (const [sel,ms] of [['.aiwb',1200],['.fmat-wrap',1600],['.behgrid',1600]]) { const loc=page.locator(sel).first(); if(await loc.count()) await show(loc,ms); }"""
+          if old not in s: raise SystemExit('section 05 patch target missing')
+          s=s.replace(old,new)
+          old2="""  await show(page.locator('.fmat-wrap'),1400); await tab('案件流程');"""
+          new2="""  { const fm=page.locator('.fmat-wrap').first(); if(await fm.count()) await show(fm,1200); else await show(page.locator('#ai9'),900); } await tab('案件流程');"""
+          if old2 not in s: raise SystemExit('section 06 patch target missing')
+          s=s.replace(old2,new2)
+          p.write_text(s,encoding='utf-8')
+          PY
+
       - name: Record actual production website interactions
         run: node scripts/record-live-demo.mjs
 
